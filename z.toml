@@ -1,0 +1,17 @@
+# Zebedee project config. Committed with the code.
+
+# Where the records store lives. Relative to this file, or absolute.
+# In containers, set Z_RECORDS to the mounted path instead (e.g. /records) —
+# git worktrees do not contain .records/.
+records_path = ".records"
+
+# Domains this project uses (one or more). Pick from the template list, or add your own.
+# Template list: dev-env, documentation, testing, ci, core, models-data,
+#                packaging-release, back-end, front-end, cli, api
+domains = ["core", "testing", "documentation"]
+
+# Extra types beyond feature, bug, enhancement, refactor, chore (larger projects only).
+extra_types = []
+
+# A claim goes stale when its owner has been inactive this long.
+claim_timeout_hours = 4

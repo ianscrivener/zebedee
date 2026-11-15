@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Auto-commits a project's records store every 5 minutes.
+  Template: install with `just z-init-launchctl-add`, remove with `just z-init-launchctl-del`.
+  Those recipes fill in PROJECT and /ABS/PATH/TO/PROJECT and load it into launchd.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.zebedee.records.PROJECT</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/ABS/PATH/TO/PROJECT/zebedee/launchd/commit-records.sh</string>
+    <string>/ABS/PATH/TO/PROJECT/.records</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>StandardErrorPath</key>
+  <string>/tmp/com.zebedee.records.PROJECT.err</string>
+</dict>
+</plist>

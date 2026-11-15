@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+/.records/
+
+.DS_Store
+Zebedde-Decision-Register.md
+
+# Zebedee maintainer checkout only (stops `just z-init` moving seed files)
+.zebedee-seed
