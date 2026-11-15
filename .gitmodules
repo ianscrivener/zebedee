@@ -1,0 +1,3 @@
+[submodule "zebedee/gui"]
+	path = zebedee/gui
+	url = https://github.com/ianscrivener/zebedee-gui
