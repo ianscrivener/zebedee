@@ -1,4 +1,4 @@
-# Zebedee — an agent-native work ledger. Recipes (v0.1).
+# Zebedee — an agent-native work ledger. Recipes (v0.2).
 #
 # Imported by the project's root justfile:   import 'zebedee/zebedee.just'
 # Don't edit in a project; update from the Zebedee repo instead.
@@ -11,11 +11,13 @@
 #
 # Agents: write records ONLY through these recipes.
 #
-# Runs in the project's Python environment (DuckDB must be installed there:
-# `uv add duckdb`, `pip install duckdb`, …). Python ≥3.10.
-# Projects not run via uv: set ZEBEDEE_CMD, e.g.  export ZEBEDEE_CMD="python zebedee/zcli.py"
+# How the helper runs (Python ≥3.10, stdlib only; DuckDB optional for z-index):
+#   1. $ZEBEDEE_CMD, if set
+#   2. else the contents of .zebedee-cmd at the project root (commit it, so every agent uses it)
+#   3. else the default for uv Python projects
+# Non-Python projects: echo 'uv run --quiet --no-project --with duckdb python zebedee/zcli.py' > .zebedee-cmd
 
-zebedee_cmd := env("ZEBEDEE_CMD", "uv run --quiet python zebedee/zcli.py")
+zebedee_cmd := env("ZEBEDEE_CMD", `c=$(grep -v '^[[:space:]]*#' .zebedee-cmd 2>/dev/null | grep . | head -1); echo "${c:-uv run --quiet python zebedee/zcli.py}"`)
 
 # ── human: project setup ─────────────────────────────────────────────
 
@@ -110,13 +112,13 @@ z-ai-whoami *args:
 z-agents:
     @{{zebedee_cmd}} agents
 
-# Work items: new | list | show | claim | release | stage | decide | reopen | close | doc
+# Work items: new | list | show | claim | release | stage | decide | reopen | edit | close | doc
 [group('shared')]
 [positional-arguments]
 z-item *args:
     @{{zebedee_cmd}} item "$@"
 
-# Test/benchmark results: record | list
+# Test/benchmark results: record | list | void
 [group('shared')]
 [positional-arguments]
 z-run *args:

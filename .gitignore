@@ -12,7 +12,6 @@ wheels/
 /.records/
 
 .DS_Store
-Zebedde-Decision-Register.md
 
 # Zebedee maintainer checkout only (stops `just z-init` moving seed files)
 .zebedee-seed

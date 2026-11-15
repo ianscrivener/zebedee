@@ -1,6 +1,6 @@
 [project]
 name = "zebedee"
-version = "0.1.0"
+version = "0.2.0"
 description = "Zebedee — an agent-native work ledger"
 readme = "README.md"
 license = "MIT"

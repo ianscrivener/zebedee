@@ -14,7 +14,7 @@ just z-run list --limit 10      # latest results
 just z-index               # build .records/index.json (+ index.duckdb if duckdb installed)
 ```
 
-For ad-hoc questions, run `just z-index` then query `.records/index.duckdb` (tables `items`, `runs`, `events`) rather than reading files:
+For ad-hoc questions, run `just z-index` then query `.records/index.duckdb` (tables `items`, `runs`, `voids`, `events`; view `live_runs` excludes voided runs) rather than reading files:
 
 ```
 uv run python -c "import duckdb; print(duckdb.connect('.records/index.duckdb').sql(\"SELECT name, metrics FROM runs WHERE kind='bench' ORDER BY ts DESC LIMIT 5\"))"

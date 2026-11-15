@@ -20,6 +20,16 @@ just z-run record --agent <uuid> --kind unit|suite|bench --name "<test or bench 
 
 Importing a historical result? Add `--as-of <original timestamp> --git-sha <commit>`. The record is marked `migrated`.
 
+## Fix a wrong run
+
+Runs are never edited or deleted. Void the wrong one, then record it again:
+
+```
+just z-run void <run_id> --agent <uuid> --reason "<what was wrong>"
+```
+
+`run_id`: the last 8 characters shown by `z-run list` are enough. Voided runs are hidden from `list`, `status` and the `live_runs` DuckDB view, but kept (`list --include-void`, `runs` table).
+
 ## Look up
 
 ```

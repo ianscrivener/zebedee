@@ -13,7 +13,8 @@ Requires your agent UUID from `/z-ai-init`. All commands: `just z-item <sub> …
 just z-item new --agent <uuid> --title "<title>" --type <type> --domains <d1,d2> [--stage N] [--intent "<1-2 sentences>"]
 ```
 
-- Default entry stage is -2 (idea). Typical entry: feature/enhancement -2, bug 1, refactor/chore 2.
+- Default entry stage is -2 (idea). Typical entry: feature/enhancement -2, bug 1, refactor/chore 2. Enter at the earliest stage that really happened. Don't invent stages to step through; `--entry-note` says why you entered late.
+- Provenance: `--commit <sha|a..b>` and `--source <path@sha>`, both repeatable.
 - Entering at stage ≥1 needs `--intent`: what it achieves and why, no *how*.
 - You own new items automatically. Prints the item ID.
 
@@ -53,6 +54,14 @@ When a parked item's revisit trigger fires:
 ```
 just z-item reopen <id> --agent <uuid> --reason "<trigger fired>"
 ```
+
+## Fix mistakes
+
+```
+just z-item edit <id> --agent <uuid> --reason "<why>" [--title "…"] [--type T] [--domains d1,d2] [--add-commit SHA] [--add-source PATH]
+```
+
+The ID never changes, so links stay valid. Every edit is logged.
 
 ## Documents
 

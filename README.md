@@ -31,7 +31,16 @@ uv sync
 4. Optional: `just z-init-launchctl-add` installs the launchd job that auto-commits `.records/` every 5 minutes. `just z-init-launchctl-del` removes it. Each project gets its own job (`com.zebedee.records.<folder>-<path hash>`), so same-named projects never collide; `just z-init-launchctl-list` shows them all.
 5. DuckDB (for `just z-index` SQL queries) is installed by `uv sync`.
 
-Requires `uv` and `just`. uv provides Python (see `.python-version`); every recipe runs through `uv run` by default (override with `ZEBEDEE_CMD`). The helper needs Python ≥3.10.
+Requires `just` and `git`. Opinionated towards `uv`, but works without it:
+
+**Python & how the helper runs.** The helper (`zebedee/zcli.py`) is a single stdlib-only script needing **Python ≥3.10**; DuckDB is optional (only `just z-index` uses it). The recipes find the command in this order: `$ZEBEDEE_CMD` → a committed `.zebedee-cmd` file at the project root → the default `uv run --quiet python zebedee/zcli.py`.
+
+| Project | Put this in `.zebedee-cmd` | DuckDB |
+|---|---|---|
+| uv Python project | _(nothing: the default works)_ | `uv add duckdb` |
+| pip / venv / Poetry Python project | `python zebedee/zcli.py` (run with the venv active) | `pip install duckdb` (+ requirements file) or `poetry add duckdb` |
+| Not Python (Node, Rust, Go, …), uv installed | `uv run --quiet --no-project --with duckdb python zebedee/zcli.py` | included by `--with` |
+| Not Python, no uv | `python3 zebedee/zcli.py` | optional: `python3 -m pip install --user duckdb` |
 
 ## Existing projects
 

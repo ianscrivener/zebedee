@@ -42,9 +42,8 @@ The goal is to **extract the project's history and knowledge** from git commits,
    - The seed's `README.md` → the project's `README-zebedee.md`. **Never touch the project's own `README.md`.** Add one line to it pointing at `README-zebedee.md`, if the project's conventions allow.
    - `justfile`: if the project has one, **add this line** near the top: `import 'zebedee/zebedee.just'`. Don't copy the recipes in. If there's no justfile, copy the template's root `justfile`. If a project recipe name clashes with a `z-*` recipe, keep the project's recipe and note the clash in the struggle log.
    - `AGENTS.md` / `CLAUDE.md`: if they exist, **append** a short Zebedee section pointing at the `z-*` skills. Don't replace their content.
-   - **DuckDB:** install it the way this project already installs packages, e.g. `uv add duckdb` (uv), `pip install duckdb` plus adding it to `requirements*.txt` (pip), or `poetry add duckdb` (Poetry). Don't introduce a new package manager.
-   - **How the helper runs:** the recipes default to `uv run python zebedee/zcli.py`. If the project isn't run via uv, set `ZEBEDEE_CMD` to the right invocation (e.g. `export ZEBEDEE_CMD="python zebedee/zcli.py"` inside the project's activated environment), document that in the project README, and note it in the struggle log.
-   - The helper needs Python ≥3.10. If the project's Python is older, stop and tell the human.
+   - **Python, DuckDB and how the helper runs:** follow the table in the seed README ("Python & how the helper runs"). In short: in a Python project, install DuckDB the way it already installs packages (don't introduce a new package manager); in any project that isn't a uv Python project, write the right command into a committed `.zebedee-cmd` file at the root. Never rely on a shell `export`, since other agents won't see it.
+   - The helper needs Python ≥3.10 available somewhere. If none is (and uv isn't installed to provide it), stop and tell the human.
 3. Run `just z-init` to create `.records/`.
 4. Register yourself: `/z-ai-init` (skill). Keep your UUID and pass `--agent <uuid>` on every write.
 5. `mkdir -p .records/migration`. The struggle log, plan and report live there.
@@ -85,16 +84,20 @@ For each item:
 1. **Create it at its entry stage** with an intent, **backdated** with `--as-of` to when the work started (the first relevant commit or doc date):
    ```
    just z-item new --agent <uuid> --title "…" --type … --domains … --stage <entry> \
-     --intent "<what it achieved and why, 1–2 sentences>" --as-of 2026-03-02T10:00
+     --intent "<what it achieved and why, 1–2 sentences>" --as-of 2026-03-02T10:00 \
+     --commit a1b2c3d..9f8e7d6 --source docs/perf-ideas.md@a1b2c3d [--entry-note "no earlier record"]
    ```
-   The item ID then carries the original date, so `ls .records/work/` reads as the real timeline.
-   - **Entry stage:** -2 if it started as an idea, -1 if it was an experiment, otherwise the earliest stage the evidence supports (often 1).
-2. **Advance it to its final stage** with `just z-item stage … --to N --as-of <date>`, one step at a time, each step dated from the evidence. A date that isn't in the evidence gets the nearest known date, noted as inferred. At stage 0, use `just z-item decide … --as-of <date>` with the historical verdict and reason (`park` needs `--revisit`). `--as-of` also works on `close` and `reopen`.
+   The item ID then carries the original date, so `ls .records/work/` reads as the real timeline. `--commit` and `--source` are repeatable and stored as queryable fields. Add more later with `just z-item edit <id> --add-commit … --reason …`.
+   - **Entry stage = the earliest stage the evidence actually shows.** -2 if there's a written idea, -1 if there's an experiment, and otherwise straight in at the stage it reached, even 5 or 6 for shipped work. **Never invent intermediate stages** to step through. If you enter late, say why with `--entry-note "no earlier record"`.
+2. **Advance only through stages the evidence shows,** with `just z-item stage … --to N --as-of <date>`, one step at a time, each dated from the evidence. At stage 0, use `just z-item decide … --as-of <date>` with the historical verdict and reason (`park` needs `--revisit`). `--as-of` also works on `close` and `reopen`.
+   - **Ideas with no outcome** stay at -2, active. An idea doesn't need a verdict.
+   - **Spikes whose outcome wasn't recorded:** advance to 0 and `decide --verdict park --revisit "verdict not recorded; re-test if relevant"`. Don't guess a commit or reject.
+   - **Mistakes:** fix a title, type or domains with `just z-item edit <id> --title … --reason …`. The item ID never changes.
 3. **Add provenance to the item body** (under Notes, via the item's files you own). Use exactly this shape:
    ```
    ### Provenance (migrated)
    - Sources: docs/perf-ideas.md@a1b2c3d, notes/kernel.md@e4f5g6h
-   - Commits: a1b2c3d..9z8y7x6 (12 commits)
+   - Commits: a1b2c3d..9f8e7d6 (12 commits; also in the `commits` field)
    - Original dates: 2026-03-02 → 2026-04-10
    - Agents/models: unknown | <if known>
    - Confidence: high | medium | low (inferred: <what>)
@@ -118,6 +121,7 @@ For each result source in the plan:
   ```
 - The environment snapshot is captured at import and labelled as such. Put any historical environment details you find (machine, OS, versions) into `metrics` under `historical_env`.
 - If results can't be tied to a harness version, use `"harness-version": "unknown"` and log it.
+- **Recorded a run wrongly** (wrong `--mode`, item or metrics)? Runs are never edited: `just z-run void <run_id> --agent <uuid> --reason "…"`, then record it again correctly. Voided runs are hidden from `list` and `status` but kept in history.
 
 ## Phase 5: Verify
 

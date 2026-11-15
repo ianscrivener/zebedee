@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zebedee — an agent-native work ledger (v0.1).
+"""Zebedee — an agent-native work ledger (v0.2).
 
 All writes to the records store go through this script, via `just` (which runs it with `uv run`).
 Stdlib only, apart from DuckDB for `index` (installed by `uv sync`).
@@ -84,6 +84,19 @@ def as_of(value: str | None, floor: str | None = None) -> str | None:
     return d.isoformat(timespec="seconds")
 
 
+COMMIT_RE = re.compile(r"^[0-9a-f]{4,40}(\.\.[0-9a-f]{4,40})?$")
+
+
+def check_commits(commits: list[str] | None) -> list[str]:
+    out = []
+    for c in commits or []:
+        c = c.strip().lower()
+        if not COMMIT_RE.match(c):
+            die(f"--commit '{c}' must be a git SHA (4–40 hex chars) or a range 'sha..sha'")
+        out.append(c)
+    return out
+
+
 def slugify(text: str, maxlen: int = 40) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return s[:maxlen].rstrip("-") or "item"
@@ -137,6 +150,8 @@ class Ctx:
     def events(self) -> Path: return self.records / "events"
     @property
     def runs(self) -> Path: return self.records / "results" / "runs"
+    @property
+    def voids(self) -> Path: return self.records / "results" / "voids"
 
     def require_records(self) -> None:
         if not self.work.is_dir():
@@ -322,7 +337,7 @@ def adopt_seed(ctx: Ctx) -> None:
 
 def cmd_setup(ctx: Ctx, a) -> None:
     adopt_seed(ctx)
-    for d in (ctx.work, ctx.agents, ctx.events, ctx.runs):
+    for d in (ctx.work, ctx.agents, ctx.events, ctx.runs, ctx.voids):
         d.mkdir(parents=True, exist_ok=True)
     gi = ctx.records / ".gitignore"
     if not gi.exists():
@@ -429,6 +444,13 @@ def cmd_item_new(ctx: Ctx, a) -> None:
     }
     if hist:
         meta["migrated"] = True
+    if a.entry_note:
+        meta["entry_note"] = a.entry_note
+    commits, sources = check_commits(a.commit), [s.strip() for s in (a.source or []) if s.strip()]
+    if commits:
+        meta["commits"] = commits
+    if sources:
+        meta["sources"] = sources
     body = render("item.md", intent=a.intent or "_Not yet stated._")
     write_md(ctx.work / iid / "item.md", meta, body)
     log_event(ctx, a.agent, "item.new", iid, ts=hist, stage=a.stage, type=a.type)
@@ -560,6 +582,46 @@ def cmd_item_reopen(ctx: Ctx, a) -> None:
     print(f"{meta['id']}: reopened at stage {meta['stage']} — decide again when ready")
 
 
+def cmd_item_edit(ctx: Ctx, a) -> None:
+    """Correct an item's title, type or domains, or add provenance. IDs never change, so links stay valid."""
+    ctx.require_records()
+    require_agent(ctx, a.agent)
+    d, meta, body = load_item(ctx, a.id)
+    require_owner(ctx, meta, a.agent)
+    changes: dict = {}
+    if a.title is not None and a.title.strip() and a.title != meta["title"]:
+        changes["title"] = [meta["title"], a.title.strip()]
+        meta["title"] = a.title.strip()
+    if a.type is not None and a.type != meta["type"]:
+        if a.type not in ctx.types:
+            die(f"unknown type '{a.type}' — one of: {', '.join(ctx.types)}")
+        changes["type"] = [meta["type"], a.type]
+        meta["type"] = a.type
+    if a.domains is not None:
+        domains = [x.strip().lower() for x in a.domains.split(",") if x.strip()]
+        if not domains:
+            die("at least one domain is required")
+        bad = [x for x in domains if x not in ctx.domains]
+        if bad:
+            die(f"unknown domain(s) {bad} — this project declares: {', '.join(ctx.domains)}")
+        if domains != meta["domains"]:
+            changes["domains"] = [meta["domains"], domains]
+            meta["domains"] = domains
+    new_commits = [c for c in check_commits(a.add_commit) if c not in meta.get("commits", [])]
+    if new_commits:
+        meta["commits"] = meta.get("commits", []) + new_commits
+        changes["commits_added"] = new_commits
+    new_sources = [s.strip() for s in (a.add_source or []) if s.strip() and s.strip() not in meta.get("sources", [])]
+    if new_sources:
+        meta["sources"] = meta.get("sources", []) + new_sources
+        changes["sources_added"] = new_sources
+    if not changes:
+        die("nothing to change — give --title, --type, --domains, --add-commit or --add-source")
+    save_item(d, meta, body)
+    log_event(ctx, a.agent, "item.edit", meta["id"], reason=a.reason, changes=changes)
+    print(f"{meta['id']}: edited {', '.join(changes)}")
+
+
 def cmd_item_close(ctx: Ctx, a) -> None:
     ctx.require_records()
     require_agent(ctx, a.agent)
@@ -659,18 +721,49 @@ def cmd_run_record(ctx: Ctx, a) -> None:
     print(rid)
 
 
-def load_runs(ctx: Ctx) -> list[dict]:
+def load_voids(ctx: Ctx) -> dict[str, dict]:
+    if not ctx.voids.exists():
+        return {}
+    return {json.loads(f.read_text())["run_id"]: json.loads(f.read_text()) for f in ctx.voids.glob("*.json")}
+
+
+def load_runs(ctx: Ctx, include_void: bool = False) -> list[dict]:
+    """All runs, oldest first. Voided runs are dropped unless include_void (then marked 'voided')."""
+    voids = load_voids(ctx)
     runs = []
     for f in sorted(ctx.runs.glob("*.jsonl")):
         for line in f.read_text().splitlines():
             if line.strip():
-                runs.append(json.loads(line))
+                r = json.loads(line)
+                if r["run_id"] in voids:
+                    if not include_void:
+                        continue
+                    r["voided"] = voids[r["run_id"]]
+                runs.append(r)
     return runs
+
+
+def cmd_run_void(ctx: Ctx, a) -> None:
+    """Runs are never edited or deleted. A wrong run is voided (hidden, kept) and re-recorded correctly."""
+    ctx.require_records()
+    require_agent(ctx, a.agent)
+    ids = {r["run_id"]: r for r in load_runs(ctx, include_void=True)}
+    matches = [rid for rid in ids if rid == a.run_id or rid.endswith(a.run_id)]
+    if len(matches) != 1:
+        die(f"no unique run matching '{a.run_id}'" + (f" ({len(matches)} matches)" if matches else ""))
+    rid = matches[0]
+    if "voided" in ids[rid]:
+        die(f"run {rid} is already void")
+    ctx.voids.mkdir(parents=True, exist_ok=True)
+    rec = {"run_id": rid, "ts": now(), "agent": a.agent, "reason": a.reason}
+    (ctx.voids / f"{rid}.json").write_text(json.dumps(rec) + "\n")
+    log_event(ctx, a.agent, "run.void", ids[rid].get("item"), run_id=rid, reason=a.reason)
+    print(f"voided {rid}")
 
 
 def cmd_run_list(ctx: Ctx, a) -> None:
     ctx.require_records()
-    runs = load_runs(ctx)
+    runs = load_runs(ctx, include_void=a.include_void)
     if a.item:
         runs = [r for r in runs if r["item"] and r["item"].startswith(a.item)]
     if a.name:
@@ -683,8 +776,9 @@ def cmd_run_list(ctx: Ctx, a) -> None:
         return
     for r in runs:
         res = {True: "pass", False: "FAIL", None: "-"}[r["passed"]]
-        print(f"{r['ts']}  {r['kind']:<5} {r['mode']:<10} {res:<4} {r['name']:<24} "
-              f"{(r['git_sha'] or '-')[:8]}{'+' if r['git_dirty'] else ''}  {json.dumps(r['metrics'])}")
+        void = "  VOID: " + r["voided"]["reason"] if "voided" in r else ""
+        print(f"{r['ts']}  {r['run_id'][-8:]}  {r['kind']:<5} {r['mode']:<10} {res:<4} {r['name']:<24} "
+              f"{(r['git_sha'] or '-')[:8]}{'+' if r['git_dirty'] else ''}  {json.dumps(r['metrics'])}{void}")
 
 
 def cmd_status(ctx: Ctx, a) -> None:
@@ -733,6 +827,11 @@ def cmd_index(ctx: Ctx, a) -> None:
     con.execute(f"CREATE TABLE items AS SELECT * FROM read_json_auto('{ctx.records / 'index.json'}')")
     if any(ctx.runs.glob("*.jsonl")):
         con.execute(f"CREATE TABLE runs AS SELECT * FROM read_json_auto('{ctx.runs}/*.jsonl')")
+        if ctx.voids.exists() and any(ctx.voids.glob("*.json")):
+            con.execute(f"CREATE TABLE voids AS SELECT * FROM read_json_auto('{ctx.voids}/*.json')")
+            con.execute("CREATE VIEW live_runs AS SELECT * FROM runs WHERE run_id NOT IN (SELECT run_id FROM voids)")
+        else:
+            con.execute("CREATE VIEW live_runs AS SELECT * FROM runs")
     if any(ctx.events.glob("*.jsonl")):
         con.execute(f"CREATE TABLE events AS SELECT * FROM read_json_auto('{ctx.events}/*.jsonl')")
     con.close()
@@ -771,6 +870,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--stage", type=int, default=-2, help="entry stage (default -2, idea)")
     s.add_argument("--intent", help="1-2 sentences; required when entering at stage ≥1")
     s.add_argument("--as-of", help="historical timestamp (ISO 8601) — for migrating past work")
+    s.add_argument("--entry-note", help="why it enters at this stage, e.g. 'no earlier record'")
+    s.add_argument("--commit", action="append", help="related git SHA or range a..b (repeatable)")
+    s.add_argument("--source", action="append", help="source doc, e.g. docs/perf.md@abc123 (repeatable)")
 
     s = it.add_parser("list")
     s.add_argument("--stage", type=int)
@@ -811,6 +913,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--reason", required=True, help="e.g. the revisit trigger fired")
     s.add_argument("--as-of", help="historical timestamp (ISO 8601) — for migrating past work")
 
+    s = it.add_parser("edit", help="correct title/type/domains or add provenance (ID never changes)")
+    s.add_argument("id")
+    s.add_argument("--agent", required=True)
+    s.add_argument("--reason", required=True)
+    s.add_argument("--title")
+    s.add_argument("--type")
+    s.add_argument("--domains", help="comma-separated; replaces the current list")
+    s.add_argument("--add-commit", action="append", help="git SHA or range a..b (repeatable)")
+    s.add_argument("--add-source", action="append", help="source doc (repeatable)")
+
     s = it.add_parser("close")
     s.add_argument("id")
     s.add_argument("--agent", required=True)
@@ -836,7 +948,13 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--pass", dest="passed", action="store_true", default=None)
     g.add_argument("--fail", dest="passed", action="store_false")
 
+    s = rn.add_parser("void", help="mark a wrong run void (kept, hidden); then re-record it")
+    s.add_argument("run_id", help="full run id or its last characters")
+    s.add_argument("--agent", required=True)
+    s.add_argument("--reason", required=True)
+
     s = rn.add_parser("list")
+    s.add_argument("--include-void", action="store_true", help="also show voided runs")
     s.add_argument("--item")
     s.add_argument("--name")
     s.add_argument("--kind", choices=RUN_KINDS)
@@ -857,7 +975,8 @@ DISPATCH = {
     ("item", "claim"): cmd_item_claim, ("item", "release"): cmd_item_release,
     ("item", "stage"): cmd_item_stage, ("item", "decide"): cmd_item_decide,
     ("item", "close"): cmd_item_close, ("item", "reopen"): cmd_item_reopen, ("item", "doc"): cmd_item_doc,
-    ("run", "record"): cmd_run_record, ("run", "list"): cmd_run_list,
+    ("run", "record"): cmd_run_record, ("run", "list"): cmd_run_list, ("run", "void"): cmd_run_void,
+    ("item", "edit"): cmd_item_edit,
     ("status", None): cmd_status, ("index", None): cmd_index,
 }
 

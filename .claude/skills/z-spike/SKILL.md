@@ -22,3 +22,5 @@ A spike's deliverable is **the verdict, not the code**. Probe code is throwaway.
    Inconclusive → `park` with a revisit trigger (e.g. "retry when the harness measures memory").
 
 Stop at the timebox even if the answer isn't clear. Inconclusive is a valid result.
+
+Migrating an old spike whose outcome was never written down? `park` it with `--revisit "verdict not recorded; re-test if relevant"`. Don't guess.

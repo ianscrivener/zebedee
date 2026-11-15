@@ -42,6 +42,21 @@ ok  z item stage "$H" --agent "$A" --to 2 --as-of 2026-01-05
 ok  z run record --agent "$A" --kind bench --name b --harness-version h --metrics '{"x":1}' --item "$I"
 ok  z run record --agent "$A" --kind bench --name b --harness-version h --metrics '{"x":2}' --as-of 2026-01-03 --git-sha abc
 bad z run record --agent "$A" --kind bench --name b --harness-version h --metrics 'notjson'
+# v0.2: provenance fields, entry note, edit, void
+P=$(z item new --agent "$A" --title "shipped thing; typo" --type feature --domains core --stage 5 --intent i --entry-note "no earlier record" --commit abc1234..def5678 --source docs/x.md@abc1234)
+grep -q 'entry_note: no earlier record' .records/work/$P/item.md && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: entry_note"; }
+grep -q '"abc1234..def5678"' .records/work/$P/item.md && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: commits field"; }
+bad z item new --agent "$A" --title x --type bug --domains core --commit notasha
+ok  z item edit "$P" --agent "$A" --title "shipped thing" --add-commit 9f8e7d6 --reason "fix title"
+grep -q '^title: shipped thing$' .records/work/$P/item.md && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: edit title"; }
+bad z item edit "$P" --agent "$A" --reason "nothing"
+bad z item edit "$P" --agent "$A" --type epic --reason r
+bad z item edit "$P" --agent "$B" --title y --reason "not owner"
+RID=$(z run record --agent "$A" --kind bench --name v --harness-version h --metrics '{"x":9}' --mode observed)
+ok  z run void "${RID: -8}" --agent "$A" --reason "wrong mode"
+bad z run void "$RID" --agent "$A" --reason "again"
+z run list | grep -q '"x": 9' && { fail=$((fail+1)); echo "FAIL: void still listed"; } || pass=$((pass+1))
+z run list --include-void | grep -q 'VOID: wrong mode' && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: include-void"; }
 ok  z item list --all
 ok  z run list
 ok  z sessions
