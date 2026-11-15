@@ -2,7 +2,7 @@
 
 > **Usage:** open your agent at the root of the project to migrate and say:
 >
-> *"Follow https://github.com/ianscrivener/zebedee/blob/main/RETROFIT_PROMPT.md"*
+> *"Follow https://raw.githubusercontent.com/ianscrivener/zebedde/refs/heads/main/RETROFIT_PROMPT.md"*
 >
 > Settings (defaults apply unless the human says otherwise):
 >
