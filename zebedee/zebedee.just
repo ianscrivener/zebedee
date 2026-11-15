@@ -91,6 +91,16 @@ z-agents-sessions *args:
 
 alias sessions := z-agents-sessions
 
+# Live read-only dashboard on http://127.0.0.1:3333 (zebedee-gui submodule). Args: --port N, --host H
+[group('human: agents')]
+[positional-arguments]
+z-agents-gui *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f zebedee/gui/server.py ] || { echo "zebedee-gui not present — run: git submodule update --init zebedee/gui" >&2; exit 1; }
+    cmd="{{zebedee_cmd}}"
+    exec ${cmd/zebedee\/zcli.py/zebedee\/gui\/server.py} "$@"
+
 # ── AI agents ────────────────────────────────────────────────────────
 
 # Register an agent session; prints its UUID. Usage: just z-ai-init --harness "Claude Code" --family Claude --model "Opus 5.5" [--session ID]

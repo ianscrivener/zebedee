@@ -2,6 +2,10 @@
 
 Zebedee — an agent-native work ledger. Versions follow semver: a **minor** bump can add commands or fields; a **major** bump changes the record format (with a migration note).
 
+## Unreleased
+
+- `zebedee-gui` submodule at `zebedee/gui`: live read-only dashboard (stdlib server + htmx/SSE), `just z-agents-gui` on port 3333.
+
 ## 0.2.0 — 2026-11-15
 
 From the first migration retrospective (#1). Additive; no record-format changes.

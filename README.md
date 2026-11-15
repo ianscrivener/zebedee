@@ -14,7 +14,7 @@ For the human. Agents read `AGENTS.md`.
 ### Setup
 
 ```
-git clone https://github.com/ianscrivener/zebedee my_project
+git clone --recurse-submodules https://github.com/ianscrivener/zebedee my_project
 cd my_project
 uv venv
 source .venv/bin/activate
@@ -50,6 +50,10 @@ Open an agent at the project root and say: *"Follow https://github.com/ianscrive
 
 Open an agent in this repo and give it `zebedee/prompts/triage-feedback.md`. It reads the feedback issues, tracks them as Zebedee items in this repo's own records, applies low-risk fixes in a PR (smoke test: `zebedee/tests/smoke.sh`), and replies on each issue. You decide the rest.
 
+## Dashboard
+
+`just z-agents-gui` serves a live, read-only dashboard on http://127.0.0.1:3333: the board across stages, agent sessions, activity and benchmark traces. It's the [zebedee-gui](https://github.com/ianscrivener/zebedee-gui) submodule at `zebedee/gui`. Clone with `--recurse-submodules`, or run `git submodule update --init zebedee/gui`.
+
 ## Commands
 
 `just --list` shows them grouped. The prefix says who runs it:
@@ -57,7 +61,7 @@ Open an agent in this repo and give it `zebedee/prompts/triage-feedback.md`. It 
 | Prefix | Who | Commands |
 |---|---|---|
 | `z-ai-*` | AI agents, directly | `z-ai-init` (register a session), `z-ai-whoami` (recover a lost UUID) |
-| `z-agents-*` | the human, overseeing agents | `z-agents-sessions` (alias `sessions`): active / stale sessions and their claims |
+| `z-agents-*` | the human, overseeing agents | `z-agents-sessions` (alias `sessions`): active / stale sessions and their claims; `z-agents-gui`: live dashboard on http://127.0.0.1:3333 |
 | `z-init*` | the human, project setup | `z-init`, `z-init-launchctl-add`, `z-init-launchctl-del`, `z-init-launchctl-list` |
 | other `z-*` | shared | `z-item`, `z-run`, `z-status`, `z-index`, `z-agents` (the manifest) |
 
