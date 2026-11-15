@@ -2,6 +2,11 @@
 
 _...from ideas to shipped code, with every spike, decision and benchmark on the record._
 
+
+
+
+<img align="right" src="zebedee/zebedee.png">
+
 <sub>v0.1.2 - Sunday 15 Novermber 2026</sub>
 
 For the human. Agents read `AGENTS.md`.
